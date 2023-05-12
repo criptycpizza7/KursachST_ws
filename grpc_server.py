@@ -19,13 +19,9 @@ class send_stocksServicer(stocks_pb2_grpc.send_stocksServicer):
         message = message[: -2]
         message += b']'
 
-        print(1)
-
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(('127.0.0.1', 9010))
             s.sendall(message)
-
-        print(2)
 
         return stocks_pb2.number(num = 0)
     
