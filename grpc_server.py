@@ -9,9 +9,12 @@ class send_stocksServicer(stocks_pb2_grpc.send_stocksServicer):
 
         # print(request.data)
 
+        num = 0
+
         message = b'['
         
         for item in request.data:
+            num += 1
             message += b'{ "id": ' + bytes(str(item.id), encoding='utf-8') + \
                       b', "time": ' + b'"' + bytes(str(item.time), encoding='utf-8') + b'"' + \
                       b', "price": ' + bytes(str(round(item.price, 2)), encoding='utf-8') + \
@@ -27,7 +30,7 @@ class send_stocksServicer(stocks_pb2_grpc.send_stocksServicer):
             s.connect(('127.0.0.1', 9010))
             s.sendall(message)
 
-        return stocks_pb2.number(num = 0)
+        return stocks_pb2.number(num = num)
     
 def main():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=5))

@@ -2,41 +2,49 @@ import asyncio
 import websockets
 
 connected = set()
+disconnected = set()
+message_cache = []
+
 
 async def websocket_handler(websocket, path):
     print('ws handler')
     connected.add(websocket)
-    # while True:
-    #     print('while true')
-    #     for connection in connected:
-    #         try:
-    #             await connection.ensure_open()
-    #         except websockets.exceptions.ConnectionClosed:
-    #             print("WebSocket connection closed")
-    #             connected.remove(websocket)
-    #         except websockets.exceptions.ConnectionClosedOK:
-    #             print('Closed ok')
-    #             await connected.remove(websocket)
     try:
         while True:
             message = await websocket.recv()
             print(f"Received message: {message}")
-            # Handle the WebSocket message as needed
-            # ...
     except websockets.exceptions.ConnectionClosed:
         print("WebSocket connection closed")
+        disconnected.add(websocket)
     finally:
-        # Remove the client from the connected set when the connection is closed
         connected.remove(websocket)
 
 
-# Start WebSocket server
+async def send_to_broken():
+
+    successful_connection = set()
+
+    for message in message_cache:
+        for client in disconnected:
+            try:
+                client.send(str(message)[2 : -1])
+
+                successful_connection.add(client)
+            except ConnectionRefusedError:
+                continue
+    
+    for client in successful_connection:
+
+        connected.add(client)
+        disconnected.remove(client)
+
+
 async def start_websocket_server():
     print('start ws')
 
     async with websockets.serve(websocket_handler, 'localhost', 9000):
         print('9000 started')
-        await asyncio.Future()  # Keep the WebSocket server running indefinitely
+        await asyncio.Future()
 
 
 async def handle_grpc(reader, writer):
@@ -45,6 +53,9 @@ async def handle_grpc(reader, writer):
 
     data = await reader.read(1024)
     print(data)
+    message_cache.append(data)
+    if len(message_cache) == 31:
+        del message_cache[0]
 
     await send_data_via_websocket(data=data)
     writer.close()
@@ -61,23 +72,16 @@ async def start_grpc_server():
 
 async def send_data_via_websocket(data):
     for connection in connected:
-        # Send multiple messages over the same WebSocket connection
         await connection.send(str(data)[2 : -1])
 
 
-# Start the WebSocket server in a separate task
 async def run_websocket_server():
     print('run_ws')
     await start_websocket_server()
 
 
-# Start both servers concurrently
 async def start_servers_concurrently():
     print(2)
-    # await asyncio.gather(
-    #     start_servers(),
-    #     run_websocket_server()
-    # )
 
     server_grpc = asyncio.create_task(start_grpc_server())
     server_ws = asyncio.create_task(start_websocket_server())
@@ -88,7 +92,5 @@ async def start_servers_concurrently():
 
 print('run')
 main_loop = asyncio.get_event_loop()
-# asyncio.run(start_servers_concurrently())
 main_loop.run_until_complete(start_servers_concurrently())
 main_loop.run_forever()
-print('no')
